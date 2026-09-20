@@ -5,12 +5,15 @@ from app.database import get_db
 from app.models.emergency import Emergency
 from app.schemas.emergency import EmergencyCreate, EmergencyOut, EmergencyStatusUpdate
 from app.services.emergency_service import create_emergency, update_emergency_status
+from app.utils.validators import is_valid_lat_lng
 
 router = APIRouter()
 
 
 @router.post("/", response_model=EmergencyOut)
 def create(payload: EmergencyCreate, db: Session = Depends(get_db)):
+    if not is_valid_lat_lng(payload.latitude, payload.longitude):
+        raise HTTPException(status_code=400, detail="Invalid latitude/longitude values")
     return create_emergency(db, payload)
 
 

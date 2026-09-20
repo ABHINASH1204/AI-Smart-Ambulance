@@ -5,12 +5,15 @@ from app.database import get_db
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.schemas.user import UserOut
 from app.services.auth_service import register_user, authenticate_user
+from app.utils.validators import is_valid_role
 
 router = APIRouter()
 
 
 @router.post("/register", response_model=UserOut)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    if not is_valid_role(payload.role):
+        raise HTTPException(status_code=400, detail="Role must be one of: USER, DRIVER, ADMIN")
     try:
         user = register_user(db, payload.name, payload.email, payload.phone, payload.password, payload.role)
         return user
