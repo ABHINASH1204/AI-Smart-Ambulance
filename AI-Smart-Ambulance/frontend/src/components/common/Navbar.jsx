@@ -10,7 +10,7 @@ import {
   Layers,
 } from "lucide-react";
 
-export default function Navbar() {
+export default function Navbar({ onOpenDirectSos }) {
   const {
     currentRole,
     setCurrentRole,
@@ -93,6 +93,22 @@ export default function Navbar() {
 
       {/* Connectivity & Quick Tools */}
       <div className="nav-actions">
+        <button
+          className="btn btn-danger nav-direct-sos-btn"
+          onClick={onOpenDirectSos}
+          style={{
+            padding: "0.42rem 0.95rem",
+            fontSize: "0.82rem",
+            fontWeight: "800",
+            letterSpacing: "0.03em",
+          }}
+          title="Instant 1-Tap Direct Emergency Dispatch"
+          id="nav-direct-sos-trigger"
+        >
+          <Siren size={16} className="siren-pulse-anim" />
+          <span>DIRECT SOS</span>
+        </button>
+
         <button
           className="btn btn-outline"
           onClick={handleSimulateRandomEmergency}
