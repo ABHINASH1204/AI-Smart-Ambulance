@@ -4,6 +4,7 @@ import Navbar from "./components/common/Navbar";
 import UserPortal from "./pages/user/UserPortal";
 import DriverPortal from "./pages/driver/DriverPortal";
 import AdminPortal from "./pages/admin/AdminPortal";
+import AmbulanceTracking from "./pages/tracking/AmbulanceTracking";
 import DirectSosModal from "./components/emergency/DirectSosModal";
 import { Siren } from "lucide-react";
 
@@ -13,6 +14,7 @@ function MainPortal() {
   return (
     <main className="main-content">
       {currentRole === "CITIZEN" && <UserPortal />}
+      {currentRole === "TRACKING" && <AmbulanceTracking />}
       {currentRole === "DRIVER" && <DriverPortal />}
       {currentRole === "ADMIN" && <AdminPortal />}
     </main>
@@ -50,11 +52,77 @@ function AppContent() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#0b0f19",
+          color: "#f8fafc",
+          padding: "2rem",
+          textAlign: "center",
+          fontFamily: "system-ui, sans-serif"
+        }}>
+          <div style={{
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            borderRadius: "16px",
+            padding: "2rem",
+            maxWidth: "600px",
+            backdropFilter: "blur(12px)"
+          }}>
+            <h2 style={{ color: "#ef4444", marginBottom: "1rem" }}>⚠️ Emergency System View Notice</h2>
+            <p style={{ color: "#94a3b8", marginBottom: "1.5rem", fontSize: "0.95rem" }}>
+              {this.state.error?.message || "An unexpected error occurred while rendering this component."}
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              style={{
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                padding: "0.75rem 1.5rem",
+                borderRadius: "8px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "1rem"
+              }}
+            >
+              🔄 Reload Application
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   return (
-    <EmergencyProvider>
-      <AppContent />
-    </EmergencyProvider>
+    <ErrorBoundary>
+      <EmergencyProvider>
+        <AppContent />
+      </EmergencyProvider>
+    </ErrorBoundary>
   );
 }
 

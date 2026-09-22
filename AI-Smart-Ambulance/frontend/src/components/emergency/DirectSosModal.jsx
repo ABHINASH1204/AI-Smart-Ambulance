@@ -73,12 +73,15 @@ class EmergencySoundPlayer {
 }
 
 export default function DirectSosModal({ isOpen, onClose }) {
-  const { triggerCitizenEmergency, setCurrentRole } = useEmergency();
+  const { triggerCitizenEmergency, setCurrentRole, userLocation, reverseGeocode } = useEmergency();
 
   const [countdown, setCountdown] = useState(3);
   const [isMuted, setIsMuted] = useState(false);
-  const [coords, setCoords] = useState({ lat: 12.9716, lng: 77.5946 });
-  const [addressText, setAddressText] = useState("Detecting GPS coordinates...");
+  const [coords, setCoords] = useState({
+    lat: userLocation?.lat || 20.2961,
+    lng: userLocation?.lng || 85.8245,
+  });
+  const [addressText, setAddressText] = useState(userLocation?.address || "Bhubaneswar, Odisha");
   const [isTransmitting, setIsTransmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
 
@@ -103,25 +106,34 @@ export default function DirectSosModal({ isOpen, onClose }) {
     setIsTransmitting(false);
     setIsComplete(false);
 
+    // Initial sync with active userLocation
+    if (userLocation) {
+      setCoords({ lat: userLocation.lat, lng: userLocation.lng });
+      setAddressText(userLocation.address || "Active Location Pinpoint");
+    }
+
     if (!isMuted) {
       soundPlayerRef.current?.start();
     }
 
-    // Geolocation detection
+    // High accuracy Geolocation detection
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCoords({
-            lat: parseFloat(pos.coords.latitude.toFixed(4)),
-            lng: parseFloat(pos.coords.longitude.toFixed(4)),
-          });
-          setAddressText("Exact GPS Location Acquired");
+        async (pos) => {
+          const lat = parseFloat(pos.coords.latitude.toFixed(4));
+          const lng = parseFloat(pos.coords.longitude.toFixed(4));
+          setCoords({ lat, lng });
+          const addr = await reverseGeocode(lat, lng);
+          setAddressText(addr || "Exact Live GPS Acquired");
         },
         () => {
-          setCoords({ lat: 12.9716, lng: 77.5946 });
-          setAddressText("Default City Metro Pinpoint");
+          setCoords({
+            lat: userLocation?.lat || 20.2961,
+            lng: userLocation?.lng || 85.8245,
+          });
+          setAddressText(userLocation?.address || "Bhubaneswar, Odisha");
         },
-        { timeout: 4000 }
+        { enableHighAccuracy: true, timeout: 4000 }
       );
     }
 
@@ -168,12 +180,12 @@ export default function DirectSosModal({ isOpen, onClose }) {
       });
 
       setIsComplete(true);
-      setCurrentRole("CITIZEN");
+      setCurrentRole("TRACKING");
 
-      // Auto close after brief confirmation
+      // Auto close modal and display live Ambulance Tracking
       setTimeout(() => {
         onClose();
-      }, 1500);
+      }, 1200);
     } catch (err) {
       console.error("Direct SOS dispatch error:", err);
       setIsTransmitting(false);

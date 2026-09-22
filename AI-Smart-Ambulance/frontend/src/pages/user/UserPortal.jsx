@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useEmergency } from "../../context/EmergencyContext";
 import EmergencyMap from "../../components/map/EmergencyMap";
+import AmbulanceTracking from "../tracking/AmbulanceTracking";
 import {
   AlertTriangle,
   MapPin,
@@ -15,30 +16,54 @@ import {
   Ambulance,
   Building2,
   XCircle,
+  Crosshair,
+  Sparkles,
 } from "lucide-react";
 
 export default function UserPortal() {
   const {
     citizenEmergency,
+    activeBooking,
     triggerCitizenEmergency,
     ambulances,
     hospitals,
     trips,
     advanceTripStatus,
+    userLocation,
+    setUserLocationAndCluster,
+    fetchCurrentLocation,
+    isDetectingLocation,
+    reverseGeocode,
   } = useEmergency();
 
+  // If citizen has an active emergency or booking, show the dedicated Ambulance Tracking feature!
+  if (citizenEmergency || activeBooking) {
+    return <AmbulanceTracking />;
+  }
+
   const [formData, setFormData] = useState({
-    caller_name: "Rahul Sharma",
-    caller_phone: "+91 98765 43210",
+    caller_name: "Rahul Mohanty",
+    caller_phone: "+91 94370 12345",
     emergency_type: "Cardiac Distress / Chest Pain",
     severity: "CRITICAL",
-    latitude: 12.9716,
-    longitude: 77.5946,
-    address_hint: "MG Road Metro Junction, Central Plaza",
+    latitude: userLocation?.lat || 20.2961,
+    longitude: userLocation?.lng || 85.8245,
+    address_hint: userLocation?.address || "Bhubaneswar, Odisha",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [gpsDetecting, setGpsDetecting] = useState(false);
+
+  // Sync formData when global userLocation changes (e.g. from GPS auto-patch)
+  useEffect(() => {
+    if (!citizenEmergency && userLocation) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        address_hint: userLocation.address,
+      }));
+    }
+  }, [userLocation, citizenEmergency]);
 
   // Quick emergency types
   const categories = [
@@ -48,34 +73,52 @@ export default function UserPortal() {
     { label: "Trauma / Bleeding", icon: Flame, type: "Major Trauma & Hemorrhage" },
   ];
 
-  const handleDetectLocation = () => {
-    setGpsDetecting(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setFormData((prev) => ({
-            ...prev,
-            latitude: parseFloat(position.coords.latitude.toFixed(4)),
-            longitude: parseFloat(position.coords.longitude.toFixed(4)),
-            address_hint: "Detected from Device GPS Sensor",
-          }));
-          setGpsDetecting(false);
-        },
-        () => {
-          // If denied, generate realistic city offset
-          setFormData((prev) => ({
-            ...prev,
-            latitude: 12.9716 + (Math.random() - 0.5) * 0.015,
-            longitude: 77.5946 + (Math.random() - 0.5) * 0.015,
-            address_hint: "Simulated Metro Pinpoint",
-          }));
-          setGpsDetecting(false);
-        },
-        { timeout: 5000 }
-      );
-    } else {
-      setGpsDetecting(false);
+  // Bhubaneswar & Regional Quick Preset Spots
+  const quickLocations = [
+    { label: "Master Canteen, BBSR", lat: 20.2675, lng: 85.842, address: "Master Canteen Square, Station Rd, Bhubaneswar" },
+    { label: "Patia / KIIT, BBSR", lat: 20.3541, lng: 85.8188, address: "KIIT Square, Patia, Bhubaneswar" },
+    { label: "AIIMS Sijua, BBSR", lat: 20.2312, lng: 85.7758, address: "AIIMS Hospital, Sijua, Bhubaneswar" },
+    { label: "Khandagiri, BBSR", lat: 20.259, lng: 85.786, address: "Khandagiri Intersection, NH-16, Bhubaneswar" },
+  ];
+
+  const handleSelectQuickLocation = async (loc) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: loc.lat,
+      longitude: loc.lng,
+      address_hint: loc.address,
+    }));
+    await setUserLocationAndCluster(loc.lat, loc.lng, loc.address, false);
+  };
+
+  const handleDetectLocation = async () => {
+    const res = await fetchCurrentLocation(true);
+    if (res && res.success) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: res.lat,
+        longitude: res.lng,
+        address_hint: res.address,
+      }));
     }
+  };
+
+  const handleMapClick = async (lat, lng) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+      address_hint: "Fetching street address...",
+    }));
+
+    const addr = await reverseGeocode(lat, lng);
+    setFormData((prev) => ({
+      ...prev,
+      address_hint: addr,
+    }));
+
+    // Update fleet cluster around newly clicked location
+    await setUserLocationAndCluster(lat, lng, addr, false);
   };
 
   const handleSosSubmit = async (e) => {
@@ -89,6 +132,7 @@ export default function UserPortal() {
         severity: formData.severity,
         latitude: formData.latitude,
         longitude: formData.longitude,
+        address_hint: formData.address_hint,
       });
     } finally {
       setIsSubmitting(false);
@@ -109,6 +153,7 @@ export default function UserPortal() {
   const recommendedHospital = assignedTrip
     ? hospitals.find((h) => h.id === assignedTrip.hospital_id)
     : hospitals[0];
+
 
   return (
     <div className="user-grid">
@@ -205,11 +250,18 @@ export default function UserPortal() {
                   <button
                     type="button"
                     onClick={handleDetectLocation}
+                    disabled={isDetectingLocation}
                     className="btn btn-outline"
-                    style={{ padding: "0.2rem 0.6rem", fontSize: "0.72rem" }}
+                    style={{
+                      padding: "0.22rem 0.65rem",
+                      fontSize: "0.72rem",
+                      borderColor: "rgba(6, 182, 212, 0.4)",
+                      color: "#38bdf8",
+                    }}
+                    title="Fetch and auto-detect your real live location"
                   >
-                    <MapPin size={12} color="#06b6d4" />
-                    {gpsDetecting ? "Detecting..." : "Detect GPS"}
+                    <Crosshair size={12} color="#06b6d4" className={isDetectingLocation ? "spin-anim" : ""} />
+                    <span>{isDetectingLocation ? "Detecting Live Location..." : "📍 Fetch Live Location"}</span>
                   </button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
@@ -244,8 +296,42 @@ export default function UserPortal() {
                   onChange={(e) =>
                     setFormData({ ...formData, address_hint: e.target.value })
                   }
-                  placeholder="Street / Landmark Landmark description"
+                  placeholder="Street / Landmark description (e.g., Near Ram Mandir, Master Canteen)"
                 />
+
+                {/* Quick Bhubaneswar / Regional Spot Selector */}
+                <div style={{ marginTop: "0.6rem" }}>
+                  <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
+                    QUICK BHUBANESWAR HUBS (OR CLICK ANYWHERE ON MAP):
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                    {quickLocations.map((loc) => (
+                      <button
+                        type="button"
+                        key={loc.label}
+                        onClick={() => handleSelectQuickLocation(loc)}
+                        className="btn btn-outline"
+                        style={{
+                          padding: "0.25rem 0.55rem",
+                          fontSize: "0.7rem",
+                          borderRadius: "14px",
+                          borderColor:
+                            Math.abs(formData.latitude - loc.lat) < 0.005 &&
+                            Math.abs(formData.longitude - loc.lng) < 0.005
+                              ? "#06b6d4"
+                              : "var(--border-subtle)",
+                          color:
+                            Math.abs(formData.latitude - loc.lat) < 0.005 &&
+                            Math.abs(formData.longitude - loc.lng) < 0.005
+                              ? "#38bdf8"
+                              : "#94a3b8",
+                        }}
+                      >
+                        📍 {loc.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Contact Info */}
@@ -433,6 +519,12 @@ export default function UserPortal() {
               : [formData.latitude, formData.longitude]
           }
           showRoute={true}
+          onLocationSelect={handleMapClick}
+          patientLocation={{
+            lat: formData.latitude,
+            lng: formData.longitude,
+            address: formData.address_hint,
+          }}
         />
       </div>
     </div>
