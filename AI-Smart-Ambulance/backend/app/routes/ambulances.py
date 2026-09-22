@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.ambulance import Ambulance
-from app.schemas.ambulance import AmbulanceOut, AmbulanceStatusUpdate
+from app.schemas.ambulance import AmbulanceOut, AmbulanceStatusUpdate, AmbulanceLocationUpdate
 from app.services.ambulance_service import (
-    get_available_ambulances, recommend_ambulance, update_ambulance_status,
+    get_available_ambulances, recommend_ambulance, update_ambulance_status, update_ambulance_location,
 )
 
 router = APIRouter()
@@ -22,8 +22,9 @@ def list_available(db: Session = Depends(get_db)):
 
 
 @router.get("/recommend", response_model=AmbulanceOut)
-def recommend(latitude: float, longitude: float, db: Session = Depends(get_db)):
-    amb = recommend_ambulance(db, latitude, longitude)
+def recommend(latitude: float, longitude: float, emergency_type: str = "Other",
+              severity: str = "MEDIUM", db: Session = Depends(get_db)):
+    amb = recommend_ambulance(db, latitude, longitude, emergency_type, severity)
     if not amb:
         raise HTTPException(status_code=404, detail="No available ambulance found")
     return amb
@@ -48,6 +49,14 @@ def set_status(ambulance_id: int, payload: AmbulanceStatusUpdate, db: Session = 
 @router.post("/{ambulance_id}/accept", response_model=AmbulanceOut)
 def accept_emergency(ambulance_id: int, db: Session = Depends(get_db)):
     amb = update_ambulance_status(db, ambulance_id, "ASSIGNED")
+    if not amb:
+        raise HTTPException(status_code=404, detail="Ambulance not found")
+    return amb
+
+
+@router.patch("/{ambulance_id}/location", response_model=AmbulanceOut)
+def update_location(ambulance_id: int, payload: AmbulanceLocationUpdate, db: Session = Depends(get_db)):
+    amb = update_ambulance_location(db, ambulance_id, payload.latitude, payload.longitude)
     if not amb:
         raise HTTPException(status_code=404, detail="Ambulance not found")
     return amb
