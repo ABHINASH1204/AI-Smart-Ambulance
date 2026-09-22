@@ -29,6 +29,7 @@ Thumbs.db
 # Python generated data/model files
 *.pkl
 *.joblib
+!ai/trained_models/*.pkl
 
 # Logs
 *.log
