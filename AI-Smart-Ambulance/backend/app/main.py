@@ -1,9 +1,12 @@
+import logging
+logging.basicConfig(level=logging.INFO)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app.middleware.error_handler import register_error_handlers
-from app.routes import auth, users, drivers, ambulances, emergencies, hospitals, trips, routes as route_router
+from app.routes import auth, users, drivers, ambulances, emergencies, hospitals, trips, routes as route_router, admin
 
 # Creates tables if they don't exist yet. For anything beyond local dev,
 # use database/schema.sql (source of truth) instead of relying on this.
@@ -33,6 +36,7 @@ app.include_router(emergencies.router, prefix="/api/emergencies", tags=["emergen
 app.include_router(hospitals.router, prefix="/api/hospitals", tags=["hospitals"])
 app.include_router(trips.router, prefix="/api/trips", tags=["trips"])
 app.include_router(route_router.router, prefix="/api/routes", tags=["routes"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 
 @app.get("/")
