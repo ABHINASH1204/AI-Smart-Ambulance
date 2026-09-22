@@ -22,8 +22,9 @@ def list_available(db: Session = Depends(get_db)):
 
 
 @router.get("/recommend", response_model=AmbulanceOut)
-def recommend(latitude: float, longitude: float, db: Session = Depends(get_db)):
-    amb = recommend_ambulance(db, latitude, longitude)
+def recommend(latitude: float, longitude: float, emergency_type: str = "Other",
+              severity: str = "MEDIUM", db: Session = Depends(get_db)):
+    amb = recommend_ambulance(db, latitude, longitude, emergency_type, severity)
     if not amb:
         raise HTTPException(status_code=404, detail="No available ambulance found")
     return amb

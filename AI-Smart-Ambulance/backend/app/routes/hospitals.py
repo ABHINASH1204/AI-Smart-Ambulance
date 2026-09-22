@@ -16,8 +16,8 @@ def list_hospitals(db: Session = Depends(get_db)):
 
 @router.get("/recommend", response_model=HospitalOut)
 def recommend(latitude: float, longitude: float, needs_icu: bool = False,
-              needs_trauma: bool = False, db: Session = Depends(get_db)):
-    hospital = recommend_hospital(db, latitude, longitude, needs_icu, needs_trauma)
+              needs_trauma: bool = False, severity: str = "MEDIUM", db: Session = Depends(get_db)):
+    hospital = recommend_hospital(db, latitude, longitude, needs_icu, needs_trauma, severity)
     if not hospital:
         raise HTTPException(status_code=404, detail="No suitable hospital found")
     return hospital
